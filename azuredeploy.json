@@ -1,0 +1,188 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+    "vNetName": {
+      "type": "string",
+      "defaultValue": "T3-TransitHubvNet",
+      "metadata": {
+        "description": "T3 Transit Hub vNet name"
+      }
+    },
+    "vNetAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.0.8.64/28",
+      "metadata": {
+        "description": "T3 virtual AddressPrefix"
+      }
+    },
+    "hub": {
+      "type": "object",
+      "defaultValue": {
+          "resourceGroup": "core",
+          "vnet": { "name": "core", "addressPrefixes": [ "10.0.0.0/16" ] },
+          "subnets": [
+              { "name": "GatewaySubnet", "addressPrefix": "10.0.0.0/24" },
+              { "name": "subnet1", "addressPrefix": "10.0.1.0/24" },
+              { "name": "subnet2", "addressPrefix": "10.0.2.0/24" },
+              { "name": "subnet3", "addressPrefix": "10.0.3.0/24" }
+          ],
+          "createGateway": true,
+          "gatewaySku": "Basic"
+      },
+      "metadata": { 
+          "description": "Hub object.  See defaultValue for example. The gatewaySku string is any of Basic|VpnGw1|VpnGw2|VpnGw3"
+      }
+  },
+    "subnetArray": {
+      "type": "array",
+      "defaultValue": [
+          {"subnet": {"name": "subnet01", "addressPrefix": "10.3.0.0/24"}},
+          {"subnet": {"name": "subnet02", "addressPrefix": "10.3.1.0/24"}},
+          {"subnet": {"name": "subnet03", "addressPrefix": "10.3.2.0/24"}}
+      ],
+      "metadata": {
+          "description": "Array of spoke objects. See defaultValue for example."
+      }
+    },
+    "vNetPeerArray": {
+      "type": "array",
+      "defaultValue": [
+          {"remoteVirtualNetwork": {"name": "T2vNet"}}
+      ],
+      "metadata": {
+          "description": "Array of spoke objects. See defaultValue for example."
+      }
+    },
+    "T1VirtualApplianceVIP": {
+      "type": "string",
+      "defaultValue": "10.0.8.4",
+      "metadata": {
+        "description": "Internal VIP of the T1 virtual appliance for access from the T2 networks"
+      }
+    }
+    },
+    "variables": {
+      "T2spokeRouteTableName": "spokeRouteTable",
+      "gatewayPublicIpName": "[concat(parameters('vnetName'), '-gateway-pip')]",
+      "PeeringName": "TransitHubtoT2"
+    },
+    "resources": [
+      {
+        "type": "Microsoft.Network/routeTables",
+        "name": "[variables('T2spokeRouteTableName')]",
+        "apiVersion": "2018-02-01",
+        "location": "[resourceGroup().location]",
+        "properties": {
+          "disableBgpRoutePropagation": true,
+          "routes": [
+            {
+              "name": "SpokeRouteTable",
+              "properties": {
+                "addressPrefix": "0.0.0.0/0",
+                "nextHopType": "VirtualAppliance",
+                "nextHopIpAddress": "[parameters('T1VirtualApplianceVIP')]"
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "Microsoft.Network/virtualNetworks",
+        "name": "[parameters('vNetName')]",
+        "apiVersion": "2018-04-01",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+          "[concat('Microsoft.Network/routeTables', variables('T2spokeRouteTableName'))]"
+        ],
+        "properties": {
+          "addressSpace": {
+            "addressPrefixes": [
+              "[parameters('vNetAddressPrefix')]"
+            ]
+          },
+          "copy": [
+            {
+              "name": "subnets",
+              "count": "[length(parameters('subnetArray'))]",
+              "input": {
+                "name": "[parameters('subnetArray')[copyIndex('subnets')].subnet.name]",
+                "properties": {
+                  "addressPrefix": "[parameters('subnetArray')[copyIndex('subnets')].subnet.addressPrefix]",
+                  "routeTable": {
+                    "id": "[resourceId('Microsoft.Network/routeTables', variables('T2spokeRouteTableName'))]"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "resources": [
+          {
+            "name": "[variables('PeeringName')]",
+            "type": "virtualNetworkPeerings",
+            "apiVersion": "2018-08-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+              "[concat('Microsoft.Network/virtualNetworks/', parameters('vNetName'))]"
+            ],
+            "properties": {
+              "allowVirtualNetworkAccess": true,
+              "allowForwardedTraffic": false,
+              "allowGatewayTransit": true,
+              "useRemoteGateways": false,
+              "remoteVirtualNetwork": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('remoteVirtualNetwork'))]"
+              },
+              "peeringState": "Connected"
+            }
+          }
+        ]
+      },
+      {
+        "name": "[variables('gatewayName')]",
+        "type": "Microsoft.Network/virtualNetworkGateways",
+        "apiVersion": "2017-10-01",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+          "[concat('Microsoft.Network/publicIPAddresses/', variables('gatewayPublicIpName'))]",
+          "[concat('Microsoft.Network/virtualNetworks/', parameters('vnetName'))]"
+        ],
+        "properties": {
+          "ipConfigurations": [
+            {
+              "properties": {
+                "privateIPAllocationMethod": "Dynamic",
+                "subnet": {
+                  "id": "[variables('gatewaySubnetId')]"
+                },
+                "publicIPAddress": {
+                  "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('gatewayPublicIpName'))]"
+                }
+              },
+              "name": "vnetGatewayConfig"
+            }
+          ],
+          "sku": {
+            "name": "[parameters('gatewaySku')]",
+            "tier": "[parameters('gatewaySku')]"
+          },
+          "gatewayType": "Vpn",
+          "vpnType": "[variables('vpnType')]",
+          "enableBgp": "false"
+        }
+      },
+      {
+        "condition": "[parameters('createGateway')]",
+        "name": "[variables('gatewayPublicIpName')]",
+        "type": "Microsoft.Network/publicIPAddresses",
+        "apiVersion": "2017-10-01",
+        "location": "[resourceGroup().location]",
+        "properties": {
+          "publicIPAllocationMethod": "Dynamic"
+        }
+      }
+    ],
+    "outputs": {
+    }
+  }
