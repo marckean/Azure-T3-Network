@@ -6,6 +6,10 @@ For the serious security concious, this is one way to do networks from within Az
 ## Azure-T3-Network
 This repo is for the Tier 3 part of the 3 tier network.
 
+<p align="center">
+  <img src="AzureNetworkT3.jpg">
+</p>
+
 ![AzureNetworkT2.jpg](AzureNetworkT2.jpg)
 
 To deploy the most trusted T3 bottom layer of this Azure network:
