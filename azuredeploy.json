@@ -18,12 +18,14 @@
     },
     "gatewaySku": {
       "type": "string",
-      "defaultValue": "VpnGw1",
+      "defaultValue": "Standard",
       "allowedValues": [
-        "Basic",
-        "VpnGw1",
-        "VpnGw2",
-        "VpnGw3"
+        "Standard",
+        "HighPerformance",
+        "UltraPerformance",
+        "ErGw1AZ",
+        "ErGw2AZ",
+        "ErGw3AZ"
       ],
       "metadata": {
         "description": "The SKU of the VPN gateway."
@@ -80,7 +82,7 @@
       {
         "name": "[variables('gatewayName')]",
         "type": "Microsoft.Network/virtualNetworkGateways",
-        "apiVersion": "2017-10-01",
+        "apiVersion": "2018-11-01",
         "location": "[resourceGroup().location]",
         "dependsOn": [
           "[concat('Microsoft.Network/publicIPAddresses/', variables('gatewayPublicIpName'))]",
@@ -98,7 +100,7 @@
                   "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('gatewayPublicIpName'))]"
                 }
               },
-              "name": "vnetGatewayConfig"
+              "name": "ERGatewayConfig"
             }
           ],
           "sku": {
