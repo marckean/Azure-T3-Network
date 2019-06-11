@@ -11,7 +11,7 @@
     },
     "vNetAddressPrefix": {
       "type": "string",
-      "defaultValue": "10.0.8.64/28",
+      "defaultValue": "10.0.8.128/28",
       "metadata": {
         "description": "T3 virtual AddressPrefix"
       }
@@ -34,7 +34,7 @@
     "subnetArray": {
       "type": "array",
       "defaultValue": [
-          {"subnet": {"name": "GatewaySubnet", "addressPrefix": "10.0.8.64/28"}}
+          {"subnet": {"name": "GatewaySubnet", "addressPrefix": "10.0.8.128/28"}}
       ],
       "metadata": {
           "description": "Array of spoke objects. See defaultValue for example."
